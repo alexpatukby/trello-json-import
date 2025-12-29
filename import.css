@@ -217,6 +217,17 @@ body {
   margin: 6px 0;
 }
 
+.legal-links {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 16px;
+}
+
+.legal-links a {
+  color: var(--muted);
+  text-decoration: underline;
+}
+
 .field input[type="text"] {
   width: 100%;
   border: 1px solid var(--border);
