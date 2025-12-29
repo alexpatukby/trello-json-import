@@ -33,6 +33,27 @@
         </div>
       </section>
 
+      <section id="licensePanel" class="panel hidden">
+        <div class="section-title">🔒 Free Trial Ended</div>
+        <div class="license-info">
+          <p>You've used all <strong>5 free imports</strong>.</p>
+          <p>Get unlimited imports with a one-time license purchase!</p>
+        </div>
+        <div class="row">
+          <a id="buyLicenseBtn" href="#" target="_blank" class="btn btn-primary">Buy License ($9)</a>
+        </div>
+        <div class="row">
+          <label class="field">
+            <div class="label">Already have a license key?</div>
+            <input id="licenseKeyInput" type="text" placeholder="Paste your license key here..." />
+          </label>
+        </div>
+        <div class="row row-inline">
+          <button id="activateLicenseBtn" class="btn btn-secondary">Activate License</button>
+          <div id="licenseStatus" class="muted"></div>
+        </div>
+      </section>
+
       <section id="mappingPanel" class="panel hidden">
         <div class="section-title">Map columns</div>
         <div class="grid">
@@ -87,6 +108,7 @@
     <script src="https://p.trellocdn.com/power-up.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="./config.js"></script>
+    <script src="./csv-parser.js"></script>
     <script src="./import.js"></script>
   </body>
 </html>

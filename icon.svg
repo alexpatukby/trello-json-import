@@ -1,6 +1,86 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <rect x="3" y="4" width="18" height="16" rx="3" stroke="#172B4D" stroke-width="1.5"/>
-  <path d="M7 8h10M7 12h10M7 16h6" stroke="#172B4D" stroke-width="1.5" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Import JSON and CSV to board logo">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0.85"/>
+    </linearGradient>
+
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0b1220" flood-opacity="0.25"/>
+    </filter>
+
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0b1220" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded app tile -->
+  <rect x="48" y="48" width="416" height="416" rx="92" fill="url(#bg)"/>
+
+  <!-- Subtle highlight -->
+  <path d="M140 92c-30 14-52 42-58 74-10 56 32 104 90 104h36c-32-22-48-58-40-96 6-30 25-56 52-70H140z"
+        fill="#ffffff" opacity="0.12"/>
+
+  <!-- Top label: JSON + CSV -->
+  <g filter="url(#soft)">
+    <rect x="170" y="80" width="172" height="44" rx="22" fill="#ffffff" opacity="0.92"/>
+  </g>
+  <text x="256" y="108"
+        text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Inter, Roboto, Helvetica, Arial, sans-serif"
+        font-size="16"
+        font-weight="700"
+        letter-spacing="1.2"
+        fill="#2563eb">JSON + CSV</text>
+
+  <!-- Board container -->
+  <g filter="url(#shadow)">
+    <rect x="114" y="138" width="284" height="236" rx="28" fill="#0b1220" opacity="0.18"/>
+    <rect x="108" y="132" width="296" height="248" rx="30" fill="url(#card)"/>
+  </g>
+
+  <!-- Columns -->
+  <g opacity="0.95">
+    <rect x="132" y="162" width="80" height="192" rx="16" fill="#0b1220" opacity="0.06"/>
+    <rect x="216" y="162" width="80" height="192" rx="16" fill="#0b1220" opacity="0.06"/>
+    <rect x="300" y="162" width="80" height="192" rx="16" fill="#0b1220" opacity="0.06"/>
+  </g>
+
+  <!-- Cards -->
+  <g filter="url(#soft)">
+    <rect x="144" y="178" width="56" height="34" rx="10" fill="#ffffff"/>
+    <rect x="144" y="222" width="56" height="34" rx="10" fill="#ffffff"/>
+    <rect x="144" y="266" width="56" height="34" rx="10" fill="#ffffff"/>
+
+    <rect x="228" y="196" width="56" height="34" rx="10" fill="#ffffff"/>
+    <rect x="228" y="240" width="56" height="34" rx="10" fill="#ffffff"/>
+
+    <rect x="312" y="178" width="56" height="34" rx="10" fill="#ffffff"/>
+    <rect x="312" y="222" width="56" height="34" rx="10" fill="#ffffff"/>
+    <rect x="312" y="286" width="56" height="34" rx="10" fill="#ffffff"/>
+  </g>
+
+  <!-- Import arrow badge -->
+  <g filter="url(#shadow)">
+    <circle cx="368" cy="358" r="54" fill="#ffffff" opacity="0.18"/>
+    <circle cx="364" cy="352" r="56" fill="#ffffff"/>
+    <circle cx="364" cy="352" r="56" fill="#ffffff" opacity="0.92"/>
+  </g>
+
+  <!-- Arrow (upwards) -->
+  <path d="M364 382c-5 0-9-4-9-9v-32l-10 10c-3 3-9 3-12 0-3-3-3-9 0-12l25-25c3-3 9-3 12 0l25 25c3 3 3 9 0 12-3 3-9 3-12 0l-10-10v32c0 5-4 9-9 9z"
+        fill="#2563eb"/>
+
+  <!-- Data dots -->
+  <g opacity="0.95">
+    <circle cx="328" cy="404" r="6" fill="#2563eb"/>
+    <circle cx="350" cy="404" r="6" fill="#0ea5e9"/>
+    <circle cx="372" cy="404" r="6" fill="#2563eb"/>
+    <circle cx="394" cy="404" r="6" fill="#0ea5e9"/>
+  </g>
 </svg>
-
-

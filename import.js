@@ -6,6 +6,12 @@ const APP_KEY = window.TRELLO_IMPORT_APP_KEY || 'YOUR_TRELLO_API_KEY';
 // Token lifetime: shorter is safer. Options include: "1hour", "1day", "30days", "never".
 const TOKEN_EXPIRATION = window.TRELLO_IMPORT_TOKEN_EXPIRATION || '1day';
 
+// License configuration
+const FREE_IMPORT_LIMIT = 5;
+// TODO: Replace with your LemonSqueezy checkout URL after creating a product
+const LEMONSQUEEZY_CHECKOUT_URL = window.TRELLO_IMPORT_CHECKOUT_URL || 'https://lemonsqueezy.com';
+const LICENSE_PRICE = '$9';
+
 const t = TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'JSON/CSV Importer' });
 
 const $ = (id) => document.getElementById(id);
@@ -35,6 +41,12 @@ const progressWrap = $('progress');
 const progressFill = $('progressFill');
 const progressText = $('progressText');
 const resultBox = $('result');
+
+const licensePanel = $('licensePanel');
+const buyLicenseBtn = $('buyLicenseBtn');
+const licenseKeyInput = $('licenseKeyInput');
+const activateLicenseBtn = $('activateLicenseBtn');
+const licenseStatusEl = $('licenseStatus');
 
 const state = {
   boardId: null,
@@ -88,6 +100,58 @@ async function storeToken(token) {
 
 async function clearStoredToken() {
   await t.remove('member', 'private', 'trelloImportToken');
+}
+
+// License and import count functions
+async function getImportCount() {
+  const count = await t.get('member', 'private', 'importCount');
+  return parseInt(count, 10) || 0;
+}
+
+async function incrementImportCount() {
+  const current = await getImportCount();
+  const newCount = current + 1;
+  await t.set('member', 'private', 'importCount', newCount);
+  return newCount;
+}
+
+async function getLicenseKey() {
+  return (await t.get('member', 'private', 'licenseKey')) || null;
+}
+
+async function setLicenseKey(key) {
+  await t.set('member', 'private', 'licenseKey', key);
+}
+
+function isValidLicenseKeyFormat(key) {
+  // LemonSqueezy license keys are typically in format: XXXXX-XXXXX-XXXXX-XXXXX
+  // Adjust this regex based on your actual license key format
+  if (!key || typeof key !== 'string') return false;
+  const trimmed = key.trim();
+  // Accept keys that are at least 16 chars and contain alphanumeric + dashes
+  return trimmed.length >= 16 && /^[A-Za-z0-9-]+$/.test(trimmed);
+}
+
+async function checkLicenseStatus() {
+  const licenseKey = await getLicenseKey();
+  if (licenseKey && isValidLicenseKeyFormat(licenseKey)) {
+    return { licensed: true, key: licenseKey };
+  }
+  
+  const importCount = await getImportCount();
+  const remaining = Math.max(0, FREE_IMPORT_LIMIT - importCount);
+  
+  return {
+    licensed: false,
+    importCount,
+    remaining,
+    limitReached: remaining <= 0,
+  };
+}
+
+async function canImport() {
+  const status = await checkLicenseStatus();
+  return status.licensed || !status.limitReached;
 }
 
 async function ensureAuthorized(interactive) {
@@ -360,16 +424,8 @@ async function parseFile(file) {
     return normalizeRowsFromJson(json);
   }
 
-  // Default: treat as CSV
-  const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-  if (parsed.errors && parsed.errors.length) {
-    const e = parsed.errors[0];
-    throw new Error(`CSV parse error: ${e.message || e.code || 'unknown error'}`);
-  }
-  const rows = (parsed.data || []).filter((r) => r && Object.keys(r).length);
-  const columns = (parsed.meta && parsed.meta.fields) || Object.keys(rows[0] || {});
-  if (!columns || !columns.length) throw new Error('CSV file appears to have no header row/columns.');
-  return { rows, columns };
+  // Default: treat as CSV (uses csv-parser.js)
+  return window.parseCSV(text);
 }
 
 function renderMapping(columns, rows) {
@@ -448,6 +504,13 @@ async function doImport() {
   setResult('');
   clearProgress();
 
+  // Check license/usage before importing
+  const usageStatus = await checkLicenseStatus();
+  if (!usageStatus.licensed && usageStatus.limitReached) {
+    showLicensePanel();
+    throw new Error('Free trial ended. Please purchase a license to continue importing.');
+  }
+
   const titleCol = titleColSel.value;
   const listCol = listColSel.value;
   const descCol = descColSel.value;
@@ -519,12 +582,27 @@ async function doImport() {
   }
 
   clearProgress();
+  
+  // Increment import count if not licensed
+  const currentStatus = await checkLicenseStatus();
+  let usageMsg = '';
+  if (!currentStatus.licensed) {
+    await incrementImportCount();
+    const newStatus = await checkLicenseStatus();
+    if (newStatus.remaining > 0) {
+      usageMsg = `\n\n📊 Free imports remaining: ${newStatus.remaining}/${FREE_IMPORT_LIMIT}`;
+    } else {
+      usageMsg = `\n\n⚠️ You've used all free imports. Purchase a license for unlimited imports.`;
+    }
+  }
+  
   setResult(
     [
       `Done.`,
       `Created cards: ${created}`,
       `Skipped rows: ${skipped}`,
       errors.length ? `\nErrors (first ${errors.length}):\n${errors.join('\n')}` : '',
+      usageMsg,
     ].join('\n')
   );
 }
@@ -644,10 +722,67 @@ function wireMappingInteractions() {
   descColSel.addEventListener('change', rerenderExtras);
 }
 
+function showLicensePanel() {
+  setHidden(licensePanel, false);
+  setHidden(mappingPanel, true);
+  buyLicenseBtn.href = LEMONSQUEEZY_CHECKOUT_URL;
+  buyLicenseBtn.textContent = `Buy License (${LICENSE_PRICE})`;
+  t.sizeTo('body');
+}
+
+function hideLicensePanel() {
+  setHidden(licensePanel, true);
+  t.sizeTo('body');
+}
+
+async function activateLicense() {
+  const key = licenseKeyInput.value.trim();
+  
+  if (!key) {
+    licenseStatusEl.textContent = 'Please enter a license key.';
+    licenseStatusEl.style.color = '#de350b';
+    return;
+  }
+  
+  if (!isValidLicenseKeyFormat(key)) {
+    licenseStatusEl.textContent = 'Invalid license key format.';
+    licenseStatusEl.style.color = '#de350b';
+    return;
+  }
+  
+  // TODO: For production, validate with LemonSqueezy API via your backend
+  // For now, we accept valid-format keys
+  await setLicenseKey(key);
+  
+  licenseStatusEl.textContent = '✅ License activated! You now have unlimited imports.';
+  licenseStatusEl.style.color = '#00875a';
+  
+  // Hide license panel and show mapping panel if we have data
+  setTimeout(() => {
+    hideLicensePanel();
+    if (state.rows.length > 0) {
+      setHidden(mappingPanel, false);
+    }
+    t.sizeTo('body');
+  }, 1500);
+}
+
+function wireLicensePanel() {
+  activateLicenseBtn.addEventListener('click', activateLicense);
+  
+  licenseKeyInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      activateLicense();
+    }
+  });
+}
+
 async function init() {
   resetAll();
   wireDropzone();
   wireMappingInteractions();
+  wireLicensePanel();
 
   authBtn.addEventListener('click', async () => {
     try {
