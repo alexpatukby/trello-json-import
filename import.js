@@ -585,15 +585,8 @@ async function doImport() {
   
   // Increment import count if not licensed
   const currentStatus = await checkLicenseStatus();
-  let usageMsg = '';
   if (!currentStatus.licensed) {
     await incrementImportCount();
-    const newStatus = await checkLicenseStatus();
-    if (newStatus.remaining > 0) {
-      usageMsg = `\n\n📊 Free imports remaining: ${newStatus.remaining}/${FREE_IMPORT_LIMIT}`;
-    } else {
-      usageMsg = `\n\n⚠️ You've used all free imports. Purchase a license for unlimited imports.`;
-    }
   }
   
   setResult(
@@ -602,7 +595,6 @@ async function doImport() {
       `Created cards: ${created}`,
       `Skipped rows: ${skipped}`,
       errors.length ? `\nErrors (first ${errors.length}):\n${errors.join('\n')}` : '',
-      usageMsg,
     ].join('\n')
   );
 }
@@ -754,7 +746,7 @@ async function activateLicense() {
   // For now, we accept valid-format keys
   await setLicenseKey(key);
   
-  licenseStatusEl.textContent = '✅ License activated! You now have unlimited imports.';
+  licenseStatusEl.textContent = 'License activated. You now have unlimited imports.';
   licenseStatusEl.style.color = '#00875a';
   
   // Hide license panel and show mapping panel if we have data
