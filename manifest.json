@@ -3,14 +3,14 @@
   "details": "Import JSON or CSV into a Trello board by mapping columns to card fields and lists.",
   "author": "Your Name",
   "icon": {
-    "url": "https://YOUR_HTTPS_DOMAIN_HERE/icon.svg"
+    "url": "https://alexpatukby.github.io/trello-json-import/icon.svg"
   },
   "capabilities": [
     "board-buttons"
   ],
   "connectors": {
     "iframe": {
-      "url": "https://YOUR_HTTPS_DOMAIN_HERE/index.html"
+      "url": "https://alexpatukby.github.io/trello-json-import/index.html"
     }
   }
 }

@@ -46,6 +46,9 @@ Steps:
 
 Important: because Pages adds `/<repo-name>/` to the URL, your Power-Up files must be referenced with that prefix.
 
+This repo is set up to use:
+- `https://alexpatukby.github.io/trello-json-import/`
+
 ### 2) Update `manifest.json`
 
 Edit `manifest.json` and replace:
@@ -58,6 +61,10 @@ Example for GitHub Pages (repo name = `trello-json-import`):
 - `icon.url`: `https://<github-username>.github.io/trello-json-import/icon.svg`
 - `connectors.iframe.url`: `https://<github-username>.github.io/trello-json-import/index.html`
 
+For this repo:
+- `icon.url`: `https://alexpatukby.github.io/trello-json-import/icon.svg`
+- `connectors.iframe.url`: `https://alexpatukby.github.io/trello-json-import/index.html`
+
 ### 3) Create a Power-Up in Trello and point it to your manifest
 
 1. Go to `https://trello.com/power-ups/admin`
@@ -67,6 +74,9 @@ Example for GitHub Pages (repo name = `trello-json-import`):
 
 Example for GitHub Pages:
 - `https://<github-username>.github.io/trello-json-import/manifest.json`
+
+For this repo:
+- `https://alexpatukby.github.io/trello-json-import/manifest.json`
 
 ### 4) Set your Trello API key
 
