@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=(), geolocation=(), payment=(), usb=()" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors https://trello.com https://*.trello.com; connect-src https://api.trello.com; img-src 'self' data:; style-src 'self'; script-src 'self' https://p.trellocdn.com https://cdn.jsdelivr.net"
+    />
+    <title>Import JSON/CSV</title>
+    <link rel="stylesheet" href="./import.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div class="title">Import JSON/CSV</div>
+        <div class="subtitle">Drag & drop a file, map columns, and import cards into existing lists.</div>
+      </header>
+
+      <section class="panel">
+        <div id="authRow" class="row row-inline">
+          <button id="authBtn" class="btn btn-secondary">Authorize Trello</button>
+          <div id="authStatus" class="muted">Not authorized</div>
+        </div>
+
+        <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop a JSON or CSV file here">
+          <div class="dropzone-title">Drop JSON or CSV here</div>
+          <div class="dropzone-subtitle">or <span class="linklike" id="pickFileLink">choose a file</span></div>
+          <input id="fileInput" type="file" accept=".json,.csv,text/csv,application/json" hidden />
+          <div id="fileMeta" class="muted"></div>
+        </div>
+      </section>
+
+      <section id="mappingPanel" class="panel hidden">
+        <div class="section-title">Map columns</div>
+        <div class="grid">
+          <label class="field">
+            <div class="label">Card title column (required)</div>
+            <select id="titleCol"></select>
+          </label>
+          <label class="field">
+            <div class="label">List/column name column (optional)</div>
+            <select id="listCol"></select>
+            <div class="hint">If set, each row can specify which Trello list to add the card to.</div>
+          </label>
+          <label class="field">
+            <div class="label">Default Trello list (used when no list column)</div>
+            <select id="defaultList"></select>
+          </label>
+          <label class="field">
+            <div class="label">Description column (optional)</div>
+            <select id="descCol"></select>
+          </label>
+        </div>
+
+        <div class="row">
+          <div class="label">Extra columns to include in description (optional)</div>
+          <div id="extraCols" class="chips"></div>
+        </div>
+
+        <div class="row row-inline">
+          <label class="checkbox">
+            <input id="createMissingLists" type="checkbox" checked />
+            Create missing Trello lists if they don't exist
+          </label>
+        </div>
+
+        <div class="row row-inline">
+          <button id="importBtn" class="btn btn-primary">Import</button>
+          <button id="resetBtn" class="btn btn-secondary">Reset</button>
+          <div id="rowCount" class="muted"></div>
+        </div>
+
+        <div id="progress" class="progress hidden">
+          <div class="progress-bar">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+          <div id="progressText" class="muted"></div>
+        </div>
+
+        <div id="result" class="result hidden"></div>
+      </section>
+    </div>
+
+    <script src="https://p.trellocdn.com/power-up.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="./config.js"></script>
+    <script src="./import.js"></script>
+  </body>
+</html>
+
+
