@@ -289,18 +289,58 @@ function getSelectedExtraCols() {
 
 function normalizeRowsFromJson(json) {
   let arr = null;
+  let listIdToName = null;
 
-  if (Array.isArray(json)) arr = json;
-  else if (json && Array.isArray(json.items)) arr = json.items;
-  else if (json && Array.isArray(json.data)) arr = json.data;
-  else if (json && Array.isArray(json.cards)) arr = json.cards;
-  else if (json && Array.isArray(json.rows)) arr = json.rows;
+  // Check if this is a nested format: { lists: [ { name, cards: [...] }, ... ] }
+  if (json && Array.isArray(json.lists) && json.lists.length > 0 && json.lists[0].cards) {
+    // Flatten cards from all lists, adding listName to each card
+    arr = [];
+    for (const list of json.lists) {
+      const listName = list.name || 'Unknown List';
+      if (Array.isArray(list.cards)) {
+        for (const card of list.cards) {
+          arr.push({ ...card, listName });
+        }
+      }
+    }
+  }
+  // Check if this is a Trello board export (has both cards and lists arrays at root)
+  else if (json && Array.isArray(json.cards) && Array.isArray(json.lists)) {
+    arr = json.cards;
+    // Build a map of list IDs to list names
+    listIdToName = new Map();
+    for (const list of json.lists) {
+      if (list.id && list.name) {
+        listIdToName.set(list.id, list.name);
+      }
+    }
+  } else if (Array.isArray(json)) {
+    arr = json;
+  } else if (json && Array.isArray(json.items)) {
+    arr = json.items;
+  } else if (json && Array.isArray(json.data)) {
+    arr = json.data;
+  } else if (json && Array.isArray(json.cards)) {
+    arr = json.cards;
+  } else if (json && Array.isArray(json.rows)) {
+    arr = json.rows;
+  }
 
   if (!arr) throw new Error('JSON must be an array of objects, or contain an array field like items/data/cards/rows.');
 
   const rows = arr
     .filter((x) => x !== null && x !== undefined)
-    .map((x) => (typeof x === 'object' && !Array.isArray(x) ? x : { value: x }));
+    .map((x) => {
+      if (typeof x !== 'object' || Array.isArray(x)) {
+        return { value: x };
+      }
+      const row = { ...x };
+      // If this is a Trello export, convert idList to listName
+      if (listIdToName && row.idList && !row.listName) {
+        row.listName = listIdToName.get(row.idList) || row.idList;
+      }
+      return row;
+    });
 
   const colSet = new Set();
   for (const r of rows) {
@@ -341,9 +381,9 @@ function renderMapping(columns, rows) {
   setSelectOptions(descColSel, columns, { allowEmpty: true, emptyLabel: '(no description column)' });
 
   titleColSel.value = guessColumn(columns, ['title', 'name', 'card', 'card title', 'summary']);
-  listColSel.value = guessColumn(columns, ['list', 'column', 'status', 'lane', 'stage']);
+  listColSel.value = guessColumn(columns, ['listName', 'list', 'column', 'status', 'lane', 'stage']);
   // If we guessed something that isn't a real list-like column, allow empty by default.
-  if (!nameKey(listColSel.value).match(/list|column|status|lane|stage/)) listColSel.value = '';
+  if (!nameKey(listColSel.value).match(/list|column|status|lane|stage|listname/)) listColSel.value = '';
 
   descColSel.value = guessColumn(columns, ['description', 'desc', 'details', 'notes']);
   if (!nameKey(descColSel.value).match(/description|desc|detail|note/)) descColSel.value = '';
@@ -507,14 +547,32 @@ async function handleFile(file) {
   state.fileName = file.name;
   fileMeta.textContent = `Selected: ${file.name} (${Math.round((file.size || 0) / 1024)} KB)`;
 
-  const { rows, columns } = await parseFile(file);
+  let rows, columns;
+  try {
+    const parsed = await parseFile(file);
+    rows = parsed.rows;
+    columns = parsed.columns;
+  } catch (err) {
+    setResult(`Error parsing file: ${err.message || err}`);
+    return;
+  }
+  
+  if (!rows || rows.length === 0) {
+    setResult('No data rows found in the file.');
+    return;
+  }
+  
+  if (!columns || columns.length === 0) {
+    setResult('No columns/fields found in the file.');
+    return;
+  }
   
   // Load Trello lists (requires auth)
   try {
     await ensureAuthorized(true);
     await loadLists();
   } catch (err) {
-    setResult('Please authorize Trello first, then try again.');
+    setResult(`Error loading Trello lists: ${err.message || err}`);
     return;
   }
   
