@@ -508,6 +508,16 @@ async function handleFile(file) {
   fileMeta.textContent = `Selected: ${file.name} (${Math.round((file.size || 0) / 1024)} KB)`;
 
   const { rows, columns } = await parseFile(file);
+  
+  // Load Trello lists (requires auth)
+  try {
+    await ensureAuthorized(true);
+    await loadLists();
+  } catch (err) {
+    setResult('Please authorize Trello first, then try again.');
+    return;
+  }
+  
   renderMapping(columns, rows);
 }
 
