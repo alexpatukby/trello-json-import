@@ -8,6 +8,8 @@
   "capabilities": [
     "board-buttons"
   ],
+  "connectorUrl": "https://alexpatukby.github.io/trello-json-import/index.html",
+  "iframeConnectorUrl": "https://alexpatukby.github.io/trello-json-import/index.html",
   "connectors": {
     "iframe": {
       "url": "https://alexpatukby.github.io/trello-json-import/index.html"
