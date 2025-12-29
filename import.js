@@ -6,7 +6,7 @@ const APP_KEY = window.TRELLO_IMPORT_APP_KEY || 'YOUR_TRELLO_API_KEY';
 // Token lifetime: shorter is safer. Options include: "1hour", "1day", "30days", "never".
 const TOKEN_EXPIRATION = window.TRELLO_IMPORT_TOKEN_EXPIRATION || '1day';
 
-const t = TrelloPowerUp.iframe({ appKey: APP_KEY });
+const t = TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'JSON/CSV Importer' });
 
 const $ = (id) => document.getElementById(id);
 
