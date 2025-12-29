@@ -107,11 +107,68 @@ async function ensureAuthorized(interactive) {
     );
   }
 
-  const token = await t.authorize({
-    type: 'popup',
-    name: 'JSON/CSV Importer',
-    scope: { read: true, write: true, account: false },
-    expiration: TOKEN_EXPIRATION,
+  // Use manual OAuth popup with postMessage callback
+  const token = await new Promise((resolve, reject) => {
+    const width = 580;
+    const height = 680;
+    const left = window.screenX + (window.innerWidth - width) / 2;
+    const top = window.screenY + (window.innerHeight - height) / 2;
+    
+    const origin = window.location.origin;
+    const authUrl = `https://trello.com/1/authorize?expiration=${TOKEN_EXPIRATION}&name=JSON%2FCSV%20Importer&scope=read,write&response_type=token&key=${APP_KEY}&callback_method=postMessage&return_url=${encodeURIComponent(origin)}`;
+    
+    let authWindow = null;
+    let resolved = false;
+    
+    const messageHandler = (event) => {
+      // Accept messages from Trello
+      if (event.origin !== 'https://trello.com') return;
+      
+      const token = event.data;
+      if (typeof token === 'string' && token.length > 0) {
+        resolved = true;
+        window.removeEventListener('message', messageHandler);
+        if (authWindow && !authWindow.closed) {
+          authWindow.close();
+        }
+        resolve(token);
+      }
+    };
+    
+    window.addEventListener('message', messageHandler);
+    
+    authWindow = window.open(
+      authUrl,
+      'TrelloAuth',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+    
+    if (!authWindow) {
+      window.removeEventListener('message', messageHandler);
+      reject(new Error('Popup blocked. Please allow popups for this site.'));
+      return;
+    }
+    
+    // Check if popup was closed without auth
+    const checkClosed = setInterval(() => {
+      if (authWindow.closed && !resolved) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', messageHandler);
+        reject(new Error('Authorization cancelled.'));
+      }
+    }, 500);
+    
+    // Timeout after 5 minutes
+    setTimeout(() => {
+      if (!resolved) {
+        clearInterval(checkClosed);
+        window.removeEventListener('message', messageHandler);
+        if (authWindow && !authWindow.closed) {
+          authWindow.close();
+        }
+        reject(new Error('Authorization timed out.'));
+      }
+    }, 5 * 60 * 1000);
   });
 
   await storeToken(token);
