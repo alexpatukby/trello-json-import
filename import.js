@@ -10,7 +10,7 @@ const TOKEN_EXPIRATION = window.TRELLO_IMPORT_TOKEN_EXPIRATION || '1day';
 const FREE_IMPORT_LIMIT = 5;
 // TODO: Replace with your LemonSqueezy checkout URL after creating a product
 const LEMONSQUEEZY_CHECKOUT_URL = window.TRELLO_IMPORT_CHECKOUT_URL || 'https://lemonsqueezy.com';
-const LICENSE_PRICE = '$9';
+const LICENSE_PRICE = '40 PLN';
 
 const t = TrelloPowerUp.iframe({ appKey: APP_KEY, appName: 'JSON/CSV Importer' });
 
