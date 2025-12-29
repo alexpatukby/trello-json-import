@@ -1,6 +1,7 @@
 /* global TrelloPowerUp */
 
-const ICON_URL = './icon.svg';
+// Use an absolute URL; Trello may render the button outside the iframe context.
+const ICON_URL = new URL('./icon.svg', window.location.href).toString();
 
 TrelloPowerUp.initialize({
   'board-buttons': function (t) {
