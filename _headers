@@ -1,0 +1,15 @@
+/*
+  Content-Security-Policy: default-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self' https://p.trellocdn.com https://cdn.jsdelivr.net; connect-src https://api.trello.com https://trello.com https://*.trello.com https://p.trellocdn.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: no-referrer
+
+/index.html
+  Content-Security-Policy: default-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self' https://p.trellocdn.com; connect-src https://trello.com https://*.trello.com https://p.trellocdn.com; img-src 'self' data:; style-src 'self'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+/import.html
+  Content-Security-Policy: default-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self' https://p.trellocdn.com https://cdn.jsdelivr.net; connect-src https://api.trello.com https://trello.com https://*.trello.com https://p.trellocdn.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
