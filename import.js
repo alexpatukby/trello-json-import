@@ -4,7 +4,7 @@
 // Get it from: https://trello.com/power-ups/admin (Power-Up settings) or https://trello.com/app-key
 const APP_KEY = window.TRELLO_IMPORT_APP_KEY || 'YOUR_TRELLO_API_KEY';
 // Token lifetime: shorter is safer. Options include: "1hour", "1day", "30days", "never".
-const TOKEN_EXPIRATION = window.TRELLO_IMPORT_TOKEN_EXPIRATION || '1day';
+const TOKEN_EXPIRATION = window.TRELLO_IMPORT_TOKEN_EXPIRATION || 'never';
 
 // License configuration
 const FREE_IMPORT_LIMIT = 5;
