@@ -7,7 +7,7 @@ window.TRELLO_IMPORT_APP_KEY = '01f8434d44ddbc61aebb6099e54287ce';
 // window.TRELLO_IMPORT_TOKEN_EXPIRATION = '1day';
 
 // LemonSqueezy checkout URL for license purchase.
-window.TRELLO_IMPORT_CHECKOUT_URL = 'https://apatuk.lemonsqueezy.com/checkout/buy/5542348a-5cb7-4bdd-8239-caa6290fc06b';
+window.TRELLO_IMPORT_CHECKOUT_URL = 'https://apatuk.lemonsqueezy.com/checkout/buy/b3f94d07-9071-4772-ba9a-122ec47c3e2b';
 
 // License price displayed in UI (just for display, actual price is set in LemonSqueezy)
 // window.TRELLO_IMPORT_LICENSE_PRICE = '$9';
