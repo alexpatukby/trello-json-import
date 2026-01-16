@@ -19,6 +19,8 @@ const $ = (id) => document.getElementById(id);
 const authBtn = $('authBtn');
 const authStatus = $('authStatus');
 const authRow = $('authRow');
+const authWarning = $('authWarning');
+const dropzoneAuthHint = $('dropzoneAuthHint');
 
 const dropzone = $('dropzone');
 const pickFileLink = $('pickFileLink');
@@ -242,7 +244,10 @@ async function ensureAuthorized(interactive) {
 
 async function trelloRequest(path, { method = 'GET', query = {}, body = null } = {}) {
   const token = await ensureAuthorized(false);
-  if (!token) throw new Error('Not authorized. Click "Authorize Trello" first.');
+  if (!token) {
+    await maybeRefreshAuthUI(); // Update UI to show auth is needed
+    throw new Error('⚠️ Authorization required. Please click "Authorize Trello" button at the top of the page to grant access to your Trello account.');
+  }
 
   const url = new URL(`https://api.trello.com/1${path}`);
   url.searchParams.set('key', APP_KEY);
@@ -455,15 +460,26 @@ async function maybeRefreshAuthUI() {
   try {
     const token = await ensureAuthorized(false);
     if (token) {
-      authStatus.textContent = 'Authorized';
+      authStatus.textContent = '✓ Authorized';
+      authStatus.style.color = '#00875a';
       authBtn.textContent = 'Re-authorize';
-      return;
+      authBtn.className = 'btn btn-secondary';
+      setHidden(authWarning, true);
+      setHidden(dropzoneAuthHint, true);
+      dropzone.classList.remove('dropzone-disabled');
+      return true;
     }
   } catch (_) {
     // ignore
   }
   authStatus.textContent = 'Not authorized';
+  authStatus.style.color = '';
   authBtn.textContent = 'Authorize Trello';
+  authBtn.className = 'btn btn-primary';
+  setHidden(authWarning, false);
+  setHidden(dropzoneAuthHint, false);
+  dropzone.classList.add('dropzone-disabled');
+  return false;
 }
 
 async function createListIfMissing(listName) {
@@ -617,6 +633,13 @@ async function handleFile(file) {
   state.fileName = file.name;
   fileMeta.textContent = `Selected: ${file.name} (${Math.round((file.size || 0) / 1024)} KB)`;
 
+  // Check authorization BEFORE parsing file
+  const isAuthorized = await maybeRefreshAuthUI();
+  if (!isAuthorized) {
+    setResult('⚠️ Please authorize Trello access first by clicking the "Authorize Trello" button above. This is required to import cards to your board.');
+    return;
+  }
+
   let rows, columns;
   try {
     const parsed = await parseFile(file);
@@ -637,12 +660,18 @@ async function handleFile(file) {
     return;
   }
   
-  // Load Trello lists (requires auth)
+  // Load Trello lists (should already be authorized, but double-check)
   try {
     await ensureAuthorized(true);
     await loadLists();
   } catch (err) {
-    setResult(`Error loading Trello lists: ${err.message || err}`);
+    const errorMsg = err.message || String(err);
+    if (errorMsg.includes('authorized') || errorMsg.includes('authorize')) {
+      setResult('⚠️ Authorization is required. Please click "Authorize Trello" above to continue. If you just authorized, try uploading the file again.');
+    } else {
+      setResult(`Error loading Trello lists: ${errorMsg}`);
+    }
+    await maybeRefreshAuthUI(); // Update UI to show auth is needed
     return;
   }
   
@@ -656,9 +685,15 @@ function wireDropzone() {
   };
 
   ['dragenter', 'dragover'].forEach((evt) => {
-    dropzone.addEventListener(evt, (e) => {
+    dropzone.addEventListener(evt, async (e) => {
       stop(e);
-      dropzone.classList.add('dragover');
+      // Check auth before allowing drop
+      const isAuthorized = await maybeRefreshAuthUI();
+      if (isAuthorized) {
+        dropzone.classList.add('dragover');
+      } else {
+        setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
+      }
     });
   });
 
@@ -679,15 +714,36 @@ function wireDropzone() {
     }
   });
 
-  dropzone.addEventListener('click', () => fileInput.click());
-  pickFileLink.addEventListener('click', (e) => {
+  dropzone.addEventListener('click', async () => {
+    const isAuthorized = await maybeRefreshAuthUI();
+    if (!isAuthorized) {
+      setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
+      authBtn.focus(); // Focus the auth button to guide user
+      return;
+    }
+    fileInput.click();
+  });
+  
+  pickFileLink.addEventListener('click', async (e) => {
     e.preventDefault();
+    const isAuthorized = await maybeRefreshAuthUI();
+    if (!isAuthorized) {
+      setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
+      authBtn.focus();
+      return;
+    }
     fileInput.click();
   });
 
-  dropzone.addEventListener('keydown', (e) => {
+  dropzone.addEventListener('keydown', async (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
+      const isAuthorized = await maybeRefreshAuthUI();
+      if (!isAuthorized) {
+        setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
+        authBtn.focus();
+        return;
+      }
       fileInput.click();
     }
   });
@@ -778,14 +834,37 @@ async function init() {
 
   authBtn.addEventListener('click', async () => {
     try {
+      authBtn.disabled = true;
+      authBtn.textContent = 'Authorizing...';
+      authStatus.textContent = 'Opening authorization window...';
+      
       // Allow re-auth: clear and re-authorize if user clicks again.
       await clearStoredToken();
       state.token = null;
       await ensureAuthorized(true);
       await maybeRefreshAuthUI();
-      setResult('');
+      setResult('✓ Authorization successful! You can now upload and import files.');
+      
+      // If we have a file already loaded, try to reload lists
+      if (state.rows.length > 0) {
+        try {
+          await loadLists();
+        } catch (err) {
+          // Ignore - user can try importing again
+        }
+      }
     } catch (e) {
-      setResult(e.message || String(e));
+      const errorMsg = e.message || String(e);
+      if (errorMsg.includes('blocked')) {
+        setResult('⚠️ Popup was blocked. Please allow popups for this site and try again.');
+      } else if (errorMsg.includes('cancelled')) {
+        setResult('⚠️ Authorization was cancelled. Please try again when ready.');
+      } else {
+        setResult(`⚠️ Authorization failed: ${errorMsg}`);
+      }
+      await maybeRefreshAuthUI();
+    } finally {
+      authBtn.disabled = false;
     }
   });
 
@@ -804,9 +883,9 @@ async function init() {
   resetBtn.addEventListener('click', resetAll);
 
   // Initial auth + lists fetch (non-interactive).
-  await maybeRefreshAuthUI();
+  const isAuthorized = await maybeRefreshAuthUI();
   try {
-    if (await ensureAuthorized(false)) {
+    if (isAuthorized) {
       await loadLists();
     }
   } catch (_) {
@@ -816,6 +895,7 @@ async function init() {
   // Hide auth row if we don't have app key configured; otherwise user can try to authorize.
   if (!APP_KEY || APP_KEY === 'YOUR_TRELLO_API_KEY') {
     authStatus.textContent = 'Set API key first (see README)';
+    authStatus.style.color = '#de350b';
   }
 
   t.sizeTo('body');

@@ -20,14 +20,25 @@
       </header>
 
       <section class="panel">
-        <div id="authRow" class="row row-inline">
-          <button id="authBtn" class="btn btn-secondary">Authorize Trello</button>
-          <div id="authStatus" class="muted">Not authorized</div>
+        <div id="authRow" class="row">
+          <div id="authWarning" class="auth-warning hidden">
+            <div class="auth-warning-icon">⚠️</div>
+            <div class="auth-warning-text">
+              <strong>Authorization required:</strong> You need to authorize this app to access your Trello account before you can import files. This is a one-time setup that allows the app to create cards on your boards.
+            </div>
+          </div>
+          <div class="row row-inline">
+            <button id="authBtn" class="btn btn-primary">Authorize Trello</button>
+            <div id="authStatus" class="muted"></div>
+          </div>
         </div>
 
         <div id="dropzone" class="dropzone" tabindex="0" role="button" aria-label="Drop a JSON or CSV file here">
           <div class="dropzone-title">Drop JSON or CSV here</div>
           <div class="dropzone-subtitle">or <span class="linklike" id="pickFileLink">choose a file</span></div>
+          <div id="dropzoneAuthHint" class="dropzone-hint hidden">
+            <strong>⚠️ Authorization required:</strong> Please authorize Trello access above before uploading files.
+          </div>
           <input id="fileInput" type="file" accept=".json,.csv,text/csv,application/json" hidden />
           <div id="fileMeta" class="muted"></div>
         </div>
