@@ -714,36 +714,45 @@ function wireDropzone() {
     }
   });
 
-  dropzone.addEventListener('click', async () => {
-    const isAuthorized = await maybeRefreshAuthUI();
-    if (!isAuthorized) {
-      setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
-      authBtn.focus(); // Focus the auth button to guide user
+  dropzone.addEventListener('click', () => {
+    // Check auth synchronously first (using cached state.token) to preserve user activation
+    if (!state.token) {
+      maybeRefreshAuthUI().then(() => {
+        setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
+        authBtn.focus();
+      });
       return;
     }
+    // Only call click if already authorized (synchronous check preserves user activation)
     fileInput.click();
   });
   
-  pickFileLink.addEventListener('click', async (e) => {
+  pickFileLink.addEventListener('click', (e) => {
     e.preventDefault();
-    const isAuthorized = await maybeRefreshAuthUI();
-    if (!isAuthorized) {
-      setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
-      authBtn.focus();
+    // Check auth synchronously first (using cached state.token) to preserve user activation
+    if (!state.token) {
+      maybeRefreshAuthUI().then(() => {
+        setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
+        authBtn.focus();
+      });
       return;
     }
+    // Only call click if already authorized (synchronous check preserves user activation)
     fileInput.click();
   });
 
-  dropzone.addEventListener('keydown', async (e) => {
+  dropzone.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      const isAuthorized = await maybeRefreshAuthUI();
-      if (!isAuthorized) {
-        setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
-        authBtn.focus();
+      // Check auth synchronously first (using cached state.token) to preserve user activation
+      if (!state.token) {
+        maybeRefreshAuthUI().then(() => {
+          setResult('⚠️ Please authorize Trello access first. Click "Authorize Trello" above.');
+          authBtn.focus();
+        });
         return;
       }
+      // Only call click if already authorized (synchronous check preserves user activation)
       fileInput.click();
     }
   });
