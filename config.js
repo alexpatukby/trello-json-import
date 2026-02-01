@@ -12,4 +12,13 @@ window.TRELLO_IMPORT_CHECKOUT_URL = 'https://apatuk.lemonsqueezy.com/checkout/bu
 // License price displayed in UI (just for display, actual price is set in LemonSqueezy)
 // window.TRELLO_IMPORT_LICENSE_PRICE = '$9';
 
+// License validation API URL (optional)
+// Since this repo is hosted on GitHub Pages, you need a separate backend service
+// Options:
+// 1. Separate Netlify function: 'https://your-function.netlify.app/.netlify/functions/validate-license'
+// 2. Vercel function: 'https://your-project.vercel.app/api/validate-license'
+// 3. Custom backend: 'https://your-backend.com/validate-license'
+// If not set, validation will be format-only (less secure)
+// window.TRELLO_IMPORT_VALIDATE_URL = 'https://your-function.netlify.app/.netlify/functions/validate-license';
+
 

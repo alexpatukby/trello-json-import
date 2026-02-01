@@ -6,9 +6,18 @@
     <meta name="referrer" content="no-referrer" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self' https://p.trellocdn.com; connect-src https://trello.com https://*.trello.com https://p.trellocdn.com; img-src 'self' data:; style-src 'self'"
+      content="default-src 'none'; base-uri 'none'; form-action 'none'; script-src 'self' https://p.trellocdn.com https://www.googletagmanager.com; connect-src https://trello.com https://*.trello.com https://p.trellocdn.com https://www.google-analytics.com https://www.googletagmanager.com; img-src 'self' data:; style-src 'self'"
     />
     <title>JSON/CSV Importer Power-Up</title>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-JD46LHFHMK"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-JD46LHFHMK');
+    </script>
   </head>
   <body>
     <div>

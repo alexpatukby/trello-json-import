@@ -425,7 +425,13 @@ async function parseFile(file) {
   const text = await file.text();
 
   if (lower.endsWith('.json') || file.type.includes('json')) {
-    const json = JSON.parse(text);
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      const hint = e.message ? ` (${e.message})` : '';
+      throw new Error(`Invalid JSON. The file could not be parsed. Please check that your file contains valid JSON.${hint}`);
+    }
     return normalizeRowsFromJson(json);
   }
 
