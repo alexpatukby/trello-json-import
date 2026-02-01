@@ -632,11 +632,13 @@ function resetAll() {
   setHidden(resultBox, true);
   clearProgress();
   setResult('');
+  fileMeta.style.color = '';
 }
 
 async function handleFile(file) {
   resetAll();
   state.fileName = file.name;
+  fileMeta.style.color = '';
   fileMeta.textContent = `Selected: ${file.name} (${Math.round((file.size || 0) / 1024)} KB)`;
 
   // Check authorization BEFORE parsing file
@@ -652,7 +654,11 @@ async function handleFile(file) {
     rows = parsed.rows;
     columns = parsed.columns;
   } catch (err) {
-    setResult(`Error parsing file: ${err.message || err}`);
+    const msg = err.message || String(err);
+    setResult(msg);
+    fileMeta.textContent = `${file.name} — Invalid file. ${msg}`;
+    fileMeta.style.color = '#de350b';
+    t.sizeTo('body');
     return;
   }
   
