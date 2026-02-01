@@ -139,6 +139,14 @@ body {
   border-radius: 8px;
   padding: 8px 10px;
   background: white;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.field select option {
+  color: var(--text);
+  background: white;
 }
 
 .hint {
