@@ -21,4 +21,9 @@ window.TRELLO_IMPORT_CHECKOUT_URL = 'https://apatuk.lemonsqueezy.com/checkout/bu
 // If not set, validation will be format-only (less secure)
 // window.TRELLO_IMPORT_VALIDATE_URL = 'https://your-function.netlify.app/.netlify/functions/validate-license';
 
+// GA4 measurement ID (optional). If set, events are sent; if not set, analytics no-op.
+window.TRELLO_IMPORT_GA4_MEASUREMENT_ID = 'G-JD46LHFHMK';
+// Set to true to log events in console (e.g. for debugging).
+// window.TRELLO_IMPORT_DEBUG = true;
+
 

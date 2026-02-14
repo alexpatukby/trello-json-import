@@ -7,7 +7,7 @@ const APP_KEY = window.TRELLO_IMPORT_APP_KEY || 'YOUR_TRELLO_API_KEY';
 const TOKEN_EXPIRATION = window.TRELLO_IMPORT_TOKEN_EXPIRATION || 'never';
 
 // License configuration
-const FREE_IMPORT_LIMIT = 5;
+const FREE_IMPORT_LIMIT = 3;
 // TODO: Replace with your LemonSqueezy checkout URL after creating a product
 const LEMONSQUEEZY_CHECKOUT_URL = window.TRELLO_IMPORT_CHECKOUT_URL || 'https://lemonsqueezy.com';
 const LICENSE_PRICE = '$9';
@@ -57,8 +57,11 @@ const state = {
   columns: [],
   rows: [],
   fileName: null,
+  fileType: 'unknown',
   token: null,
 };
+
+let powerupOpenFired = false;
 
 function nameKey(name) {
   return String(name || '').trim().toLowerCase();
@@ -90,6 +93,25 @@ function clearProgress() {
 async function getBoardId() {
   const ctx = await t.getContext();
   return ctx.board || ctx.boardId || (ctx.board && ctx.board.id) || null;
+}
+
+async function getTrelloContext() {
+  const ctx = await t.getContext();
+  const boardId = ctx.board || ctx.boardId || (ctx.board && ctx.board.id) || null;
+  const memberId = ctx.member || ctx.memberId || (ctx.member && ctx.member.id) || null;
+  return { boardId, memberId };
+}
+
+async function getGaEventParams(extra) {
+  if (typeof window.trackEvent !== 'function') return extra || {};
+  try {
+    const ctx = await getTrelloContext();
+    const board_id_hash = ctx.boardId && window.hashId ? await window.hashId(ctx.boardId) : undefined;
+    const member_id_hash = ctx.memberId && window.hashId ? await window.hashId(ctx.memberId) : undefined;
+    return Object.assign({ free_limit: FREE_IMPORT_LIMIT, board_id_hash, member_id_hash }, extra || {});
+  } catch (_) {
+    return Object.assign({ free_limit: FREE_IMPORT_LIMIT }, extra || {});
+  }
 }
 
 async function getStoredToken() {
@@ -525,6 +547,7 @@ function buildDesc(row, { descCol, extraCols, excludeCols }) {
 async function doImport() {
   setResult('');
   clearProgress();
+  const importStartTime = Date.now();
 
   // Check license/usage before importing
   const usageStatus = await checkLicenseStatus();
@@ -544,6 +567,13 @@ async function doImport() {
   if (!listCol && !defaultListName) throw new Error('Please select a default Trello list (or provide a list column).');
   if (!state.rows.length) throw new Error('No rows to import.');
 
+  const importNumberBefore = await getImportCount();
+  if (typeof window.trackEvent === 'function') {
+    getGaEventParams({ file_type: state.fileType || 'unknown', import_number: importNumberBefore }).then(function (p) {
+      window.trackEvent('import_started', p);
+    });
+  }
+
   await ensureAuthorized(true);
   await loadLists();
 
@@ -551,6 +581,7 @@ async function doImport() {
 
   let created = 0;
   let skipped = 0;
+  let listsCreated = 0;
   const errors = [];
 
   const total = state.rows.length;
@@ -588,6 +619,7 @@ async function doImport() {
           continue;
         }
         listId = await createListIfMissing(targetListName);
+        listsCreated++;
       }
 
       const desc = buildDesc(row, { descCol, extraCols, excludeCols });
@@ -604,13 +636,27 @@ async function doImport() {
   }
 
   clearProgress();
-  
+
   // Increment import count if not licensed
   const currentStatus = await checkLicenseStatus();
   if (!currentStatus.licensed) {
     await incrementImportCount();
   }
-  
+  const importNumberAfter = await getImportCount();
+  const durationMs = Date.now() - importStartTime;
+
+  if (typeof window.trackEvent === 'function') {
+    getGaEventParams({
+      file_type: state.fileType || 'unknown',
+      cards_imported: created,
+      lists_created: listsCreated,
+      duration_ms: durationMs,
+      import_number: importNumberAfter,
+    }).then(function (p) {
+      window.trackEvent('import_success', p);
+    });
+  }
+
   setResult(
     [
       `Done.`,
@@ -625,6 +671,7 @@ function resetAll() {
   state.columns = [];
   state.rows = [];
   state.fileName = null;
+  state.fileType = 'unknown';
   fileMeta.textContent = '';
 
   setHidden(mappingPanel, true);
@@ -649,16 +696,23 @@ async function handleFile(file) {
   }
 
   let rows, columns;
+  const fileTypeFromName = (file.name || '').toLowerCase().endsWith('.json') ? 'json' : ((file.name || '').toLowerCase().endsWith('.csv') ? 'csv' : 'unknown');
   try {
     const parsed = await parseFile(file);
     rows = parsed.rows;
     columns = parsed.columns;
+    state.fileType = fileTypeFromName;
   } catch (err) {
     const msg = err.message || String(err);
     setResult(msg);
     fileMeta.textContent = `${file.name} — Invalid file. ${msg}`;
     fileMeta.style.color = '#de350b';
     t.sizeTo('body');
+    if (typeof window.trackEvent === 'function') {
+      getGaEventParams({ file_type: fileTypeFromName, error_code: 'parse_error', duration_ms: 0 }).then(function (p) {
+        window.trackEvent('import_failed', p);
+      });
+    }
     return;
   }
   
@@ -797,6 +851,13 @@ function showLicensePanel() {
   buyLicenseBtn.href = LEMONSQUEEZY_CHECKOUT_URL;
   buyLicenseBtn.textContent = `Buy License (${LICENSE_PRICE})`;
   t.sizeTo('body');
+  if (typeof window.trackEvent === 'function') {
+    getImportCount().then(function (n) {
+      return getGaEventParams({ import_number: n });
+    }).then(function (p) {
+      window.trackEvent('paywall_shown', p);
+    });
+  }
 }
 
 function hideLicensePanel() {
@@ -837,8 +898,17 @@ async function activateLicense() {
 }
 
 function wireLicensePanel() {
+  buyLicenseBtn.addEventListener('click', function (e) {
+    if (typeof window.trackEvent === 'function') {
+      getGaEventParams({ plan: 'lifetime_9' }).then(function (p) {
+        window.trackEvent('upgrade_clicked', p);
+        window.trackEvent('checkout_started', p);
+      });
+    }
+  });
+
   activateLicenseBtn.addEventListener('click', activateLicense);
-  
+
   licenseKeyInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -891,11 +961,23 @@ async function init() {
 
   importBtn.addEventListener('click', async () => {
     importBtn.disabled = true;
+    const importStartTime = Date.now();
     try {
       await doImport();
     } catch (e) {
       clearProgress();
       setResult(e.message || String(e));
+      const errorCode = (e.message || '').includes('authoriz') ? 'auth_required' : (e.message || '').includes('license') ? 'limit_reached' : 'api_error';
+      if (typeof window.trackEvent === 'function') {
+        getGaEventParams({
+          file_type: state.fileType || 'unknown',
+          error_code: errorCode,
+          duration_ms: Date.now() - importStartTime,
+          import_number: await getImportCount(),
+        }).then(function (p) {
+          window.trackEvent('import_failed', p);
+        });
+      }
     } finally {
       importBtn.disabled = false;
     }
@@ -917,6 +999,13 @@ async function init() {
   if (!APP_KEY || APP_KEY === 'YOUR_TRELLO_API_KEY') {
     authStatus.textContent = 'Set API key first (see README)';
     authStatus.style.color = '#de350b';
+  }
+
+  if (!powerupOpenFired && typeof window.trackEvent === 'function') {
+    powerupOpenFired = true;
+    getGaEventParams({}).then(function (p) {
+      window.trackEvent('powerup_open', p);
+    });
   }
 
   t.sizeTo('body');
