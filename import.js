@@ -849,7 +849,7 @@ function showLicensePanel() {
   setHidden(licensePanel, false);
   setHidden(mappingPanel, true);
   buyLicenseBtn.href = LEMONSQUEEZY_CHECKOUT_URL;
-  buyLicenseBtn.textContent = `Buy License (${LICENSE_PRICE})`;
+  buyLicenseBtn.textContent = `Buy Lifetime License – ${LICENSE_PRICE}`;
   t.sizeTo('body');
   if (typeof window.trackEvent === 'function') {
     getImportCount().then(function (n) {
