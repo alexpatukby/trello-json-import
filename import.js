@@ -49,6 +49,7 @@ const buyLicenseBtn = $('buyLicenseBtn');
 const licenseKeyInput = $('licenseKeyInput');
 const activateLicenseBtn = $('activateLicenseBtn');
 const licenseStatusEl = $('licenseStatus');
+const appVersionEl = $('appVersion');
 
 const state = {
   boardId: null,
@@ -1044,6 +1045,11 @@ async function init() {
     getGaEventParams({}).then(function (p) {
       window.trackEvent('powerup_open', p);
     });
+  }
+
+  if (appVersionEl) {
+    const v = window.TRELLO_IMPORT_APP_VERSION || '';
+    appVersionEl.textContent = v ? `Version ${v}` : '';
   }
 
   t.sizeTo('body');
