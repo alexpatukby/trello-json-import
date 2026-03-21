@@ -114,6 +114,36 @@ async function getGaEventParams(extra) {
   }
 }
 
+/** Returns 'validation' (do not send import_failed) or a specific error_code for real failures. No PII. */
+function getImportErrorCode(message) {
+  const msg = (message || '').trim();
+  if (/please select a card title column/i.test(msg)) return 'validation';
+  if (/please select a default trello list/i.test(msg)) return 'validation';
+  if (/no rows to import/i.test(msg)) return 'validation';
+  if (/authoriz/i.test(msg)) return 'auth_required';
+  if (/license|free trial ended|limit/i.test(msg)) return 'limit_reached';
+  if (/\b401\b/.test(msg)) return 'api_401';
+  if (/\b403\b/.test(msg)) return 'api_403';
+  if (/\b404\b/.test(msg)) return 'api_404';
+  if (/\b5\d{2}\b/.test(msg)) return 'api_5xx';
+  if (/fetch|network|failed to load/i.test(msg)) return 'network_error';
+  return 'api_error';
+}
+
+/** Returns safe parse-error details for GA (no PII, no raw message). */
+function getParseErrorDetail(message) {
+  const msg = (message || '').trim();
+  const out = {};
+  if (/unexpected token/i.test(msg)) out.parse_error_type = 'unexpected_token';
+  else if (/unexpected end|end of json/i.test(msg)) out.parse_error_type = 'unexpected_end';
+  else if (/not valid json|invalid json/i.test(msg)) out.parse_error_type = 'invalid_json';
+  else if (/quoted field|delimiter|csv|parse/i.test(msg)) out.parse_error_type = 'invalid_csv';
+  else out.parse_error_type = 'other';
+  const posMatch = msg.match(/position\s*(\d+)/i);
+  if (posMatch) out.parse_error_position = parseInt(posMatch[1], 10);
+  return out;
+}
+
 async function getStoredToken() {
   return (await t.get('member', 'private', 'trelloImportToken')) || null;
 }
@@ -709,7 +739,15 @@ async function handleFile(file) {
     fileMeta.style.color = '#de350b';
     t.sizeTo('body');
     if (typeof window.trackEvent === 'function') {
-      getGaEventParams({ file_type: fileTypeFromName, error_code: 'parse_error', duration_ms: 0 }).then(function (p) {
+      const parseDetail = getParseErrorDetail(msg);
+      const payload = {
+        file_type: fileTypeFromName,
+        error_code: 'parse_error',
+        duration_ms: 0,
+        parse_error_type: parseDetail.parse_error_type,
+      };
+      if (parseDetail.parse_error_position !== undefined) payload.parse_error_position = parseDetail.parse_error_position;
+      getGaEventParams(payload).then(function (p) {
         window.trackEvent('import_failed', p);
       });
     }
@@ -967,8 +1005,8 @@ async function init() {
     } catch (e) {
       clearProgress();
       setResult(e.message || String(e));
-      const errorCode = (e.message || '').includes('authoriz') ? 'auth_required' : (e.message || '').includes('license') ? 'limit_reached' : 'api_error';
-      if (typeof window.trackEvent === 'function') {
+      const errorCode = getImportErrorCode(e.message || String(e));
+      if (errorCode !== 'validation' && typeof window.trackEvent === 'function') {
         getGaEventParams({
           file_type: state.fileType || 'unknown',
           error_code: errorCode,
