@@ -910,12 +910,22 @@ async function activateLicense() {
   if (!key) {
     licenseStatusEl.textContent = 'Please enter a license key.';
     licenseStatusEl.style.color = '#de350b';
+    if (typeof window.trackEvent === 'function') {
+      getGaEventParams({ license_key_reason: 'empty' }).then(function (p) {
+        window.trackEvent('license_key_invalid', p);
+      });
+    }
     return;
   }
-  
+
   if (!isValidLicenseKeyFormat(key)) {
-    licenseStatusEl.textContent = 'Invalid license key format.';
+    licenseStatusEl.textContent = 'Invalid license key. Please check and try again.';
     licenseStatusEl.style.color = '#de350b';
+    if (typeof window.trackEvent === 'function') {
+      getGaEventParams({ license_key_reason: 'invalid_format' }).then(function (p) {
+        window.trackEvent('license_key_invalid', p);
+      });
+    }
     return;
   }
   
@@ -937,11 +947,10 @@ async function activateLicense() {
 }
 
 function wireLicensePanel() {
-  buyLicenseBtn.addEventListener('click', function (e) {
+  buyLicenseBtn.addEventListener('click', function () {
     if (typeof window.trackEvent === 'function') {
       getGaEventParams({ plan: 'lifetime_9' }).then(function (p) {
         window.trackEvent('upgrade_clicked', p);
-        window.trackEvent('checkout_started', p);
       });
     }
   });
