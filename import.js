@@ -57,6 +57,10 @@ const state = {
   listIdByNameKey: new Map(),
   columns: [],
   rows: [],
+  /** @type {{ name: string, pos: number }[] | null} From Trello-style JSON `lists` (empty columns + order). */
+  explicitBackupLists: null,
+  /** True when JSON had lists but zero cards — import only creates missing lists. */
+  importListsOnly: false,
   fileName: null,
   fileType: 'unknown',
   token: null,
@@ -66,6 +70,33 @@ let powerupOpenFired = false;
 
 function nameKey(name) {
   return String(name || '').trim().toLowerCase();
+}
+
+/**
+ * Lists from a Trello backup/export (open lists only, stable order by `pos`).
+ * Skips closed/archived lists and duplicate names (first wins).
+ */
+function buildExplicitBackupListsFromTrelloLists(listArray) {
+  if (!Array.isArray(listArray) || listArray.length === 0) return null;
+  const seen = new Set();
+  const out = [];
+  let fallbackOrder = 0;
+  for (const list of listArray) {
+    if (!list || typeof list !== 'object') continue;
+    if (list.closed === true) continue;
+    const name = String(list.name ?? '').trim();
+    if (!name) continue;
+    const nk = nameKey(name);
+    if (seen.has(nk)) continue;
+    seen.add(nk);
+    const pos =
+      typeof list.pos === 'number' && Number.isFinite(list.pos) ? list.pos : fallbackOrder;
+    out.push({ name, pos, order: fallbackOrder });
+    fallbackOrder += 1;
+  }
+  if (!out.length) return null;
+  out.sort((a, b) => (a.pos !== b.pos ? a.pos - b.pos : a.order - b.order));
+  return out.map(({ name, pos }) => ({ name, pos }));
 }
 
 function setHidden(el, hidden) {
@@ -412,9 +443,11 @@ function getSelectedExtraCols() {
 function normalizeRowsFromJson(json) {
   let arr = null;
   let listIdToName = null;
+  let explicitBackupLists = null;
 
   // Check if this is a nested format: { lists: [ { name, cards: [...] }, ... ] }
   if (json && Array.isArray(json.lists) && json.lists.length > 0 && json.lists[0].cards) {
+    explicitBackupLists = buildExplicitBackupListsFromTrelloLists(json.lists);
     // Flatten cards from all lists, adding listName to each card
     arr = [];
     for (const list of json.lists) {
@@ -428,6 +461,7 @@ function normalizeRowsFromJson(json) {
   }
   // Check if this is a Trello board export (has both cards and lists arrays at root)
   else if (json && Array.isArray(json.cards) && Array.isArray(json.lists)) {
+    explicitBackupLists = buildExplicitBackupListsFromTrelloLists(json.lists);
     arr = json.cards;
     // Build a map of list IDs to list names
     listIdToName = new Map();
@@ -469,7 +503,7 @@ function normalizeRowsFromJson(json) {
     for (const k of Object.keys(r)) colSet.add(k);
   }
   const columns = Array.from(colSet);
-  return { rows, columns };
+  return { rows, columns, explicitBackupLists };
 }
 
 async function parseFile(file) {
@@ -489,10 +523,42 @@ async function parseFile(file) {
   }
 
   // Default: treat as CSV (uses csv-parser.js)
-  return window.parseCSV(text);
+  const csv = window.parseCSV(text);
+  return { rows: csv.rows, columns: csv.columns, explicitBackupLists: null };
+}
+
+function renderListOnlyImportPanel() {
+  state.columns = [];
+  state.rows = [];
+  state.importListsOnly = true;
+
+  titleColSel.disabled = true;
+  listColSel.disabled = true;
+  descColSel.disabled = true;
+
+  setSelectOptions(titleColSel, [], { allowEmpty: true, emptyLabel: '(no cards in file)' });
+  titleColSel.value = '';
+  setSelectOptions(listColSel, [], { allowEmpty: true, emptyLabel: '(not used)' });
+  listColSel.value = '';
+  setSelectOptions(descColSel, [], { allowEmpty: true, emptyLabel: '(not used)' });
+  descColSel.value = '';
+
+  extraColsWrap.innerHTML = '';
+  rowCount.textContent = `${state.explicitBackupLists.length} list column(s) in backup; no cards. Import creates missing lists only.`;
+  if (!createMissingListsChk.checked) {
+    rowCount.textContent += ' Turn on "Create missing lists" below.';
+  }
+
+  setHidden(mappingPanel, false);
+  t.sizeTo('body');
 }
 
 function renderMapping(columns, rows) {
+  state.importListsOnly = false;
+  titleColSel.disabled = false;
+  listColSel.disabled = false;
+  descColSel.disabled = false;
+
   state.columns = columns;
   state.rows = rows;
 
@@ -575,6 +641,19 @@ function buildDesc(row, { descCol, extraCols, excludeCols }) {
   return `${base}\n\n${extraBlock}`;
 }
 
+async function ensureExplicitBackupListsMissingOnly(createMissing) {
+  let created = 0;
+  if (!createMissing || !state.explicitBackupLists || !state.explicitBackupLists.length) return created;
+  for (const entry of state.explicitBackupLists) {
+    const key = nameKey(entry.name);
+    if (!state.listIdByNameKey.has(key)) {
+      await createListIfMissing(entry.name);
+      created++;
+    }
+  }
+  return created;
+}
+
 async function doImport() {
   setResult('');
   clearProgress();
@@ -594,6 +673,79 @@ async function doImport() {
   const createMissing = !!createMissingListsChk.checked;
   const extraCols = getSelectedExtraCols();
 
+  if (state.importListsOnly) {
+    if (!state.explicitBackupLists || !state.explicitBackupLists.length) {
+      throw new Error('No lists to import from this file.');
+    }
+    if (!createMissing) {
+      throw new Error('Turn on "Create missing Trello lists if they don\'t exist" to add columns from this backup.');
+    }
+
+    const importNumberBefore = await getImportCount();
+    if (typeof window.trackEvent === 'function') {
+      getGaEventParams({
+        file_type: state.fileType || 'unknown',
+        import_number: importNumberBefore,
+        import_lists_only: true,
+      }).then(function (p) {
+        window.trackEvent('import_started', p);
+      });
+    }
+
+    await ensureAuthorized(true);
+    await loadLists();
+
+    let listsCreated = 0;
+    const errors = [];
+    const totalLists = state.explicitBackupLists.length;
+
+    for (let i = 0; i < totalLists; i++) {
+      const entry = state.explicitBackupLists[i];
+      const pct = Math.round(((i + 1) / totalLists) * 100);
+      setProgress(pct, `Creating lists ${i + 1} / ${totalLists}...`);
+      try {
+        const key = nameKey(entry.name);
+        if (!state.listIdByNameKey.has(key)) {
+          await createListIfMissing(entry.name);
+          listsCreated++;
+        }
+      } catch (e) {
+        if (errors.length < 30) errors.push(`List "${entry.name}": ${e.message || String(e)}`);
+      }
+    }
+
+    clearProgress();
+
+    const currentStatus = await checkLicenseStatus();
+    if (!currentStatus.licensed) {
+      await incrementImportCount();
+    }
+    const importNumberAfter = await getImportCount();
+    const durationMs = Date.now() - importStartTime;
+
+    if (typeof window.trackEvent === 'function') {
+      getGaEventParams({
+        file_type: state.fileType || 'unknown',
+        cards_imported: 0,
+        import_lists_only: true,
+        lists_created: listsCreated,
+        duration_ms: durationMs,
+        import_number: importNumberAfter,
+      }).then(function (p) {
+        window.trackEvent('import_success', p);
+      });
+    }
+
+    setResult(
+      [
+        `Done.`,
+        `Created lists: ${listsCreated}`,
+        errors.length ? `\nErrors (first ${errors.length}):\n${errors.join('\n')}` : '',
+      ].join('\n')
+    );
+    return;
+  }
+
   if (!titleCol) throw new Error('Please select a card title column.');
   if (!listCol && !defaultListName) throw new Error('Please select a default Trello list (or provide a list column).');
   if (!state.rows.length) throw new Error('No rows to import.');
@@ -608,11 +760,13 @@ async function doImport() {
   await ensureAuthorized(true);
   await loadLists();
 
+  let listsCreated = 0;
+  listsCreated += await ensureExplicitBackupListsMissingOnly(createMissing);
+
   const excludeCols = new Set([titleCol, listCol, descCol].filter(Boolean));
 
   let created = 0;
   let skipped = 0;
-  let listsCreated = 0;
   const errors = [];
 
   const total = state.rows.length;
@@ -691,19 +845,28 @@ async function doImport() {
   setResult(
     [
       `Done.`,
+      listsCreated ? `New lists: ${listsCreated}` : null,
       `Created cards: ${created}`,
       `Skipped rows: ${skipped}`,
       errors.length ? `\nErrors (first ${errors.length}):\n${errors.join('\n')}` : '',
-    ].join('\n')
+    ]
+      .filter(Boolean)
+      .join('\n')
   );
 }
 
 function resetAll() {
   state.columns = [];
   state.rows = [];
+  state.explicitBackupLists = null;
+  state.importListsOnly = false;
   state.fileName = null;
   state.fileType = 'unknown';
   fileMeta.textContent = '';
+
+  titleColSel.disabled = false;
+  listColSel.disabled = false;
+  descColSel.disabled = false;
 
   setHidden(mappingPanel, true);
   setHidden(progressWrap, true);
@@ -732,6 +895,7 @@ async function handleFile(file) {
     const parsed = await parseFile(file);
     rows = parsed.rows;
     columns = parsed.columns;
+    state.explicitBackupLists = parsed.explicitBackupLists || null;
     state.fileType = fileTypeFromName;
   } catch (err) {
     const msg = err.message || String(err);
@@ -755,16 +919,23 @@ async function handleFile(file) {
     return;
   }
   
+  const listOnlyOk =
+    state.explicitBackupLists &&
+    state.explicitBackupLists.length > 0 &&
+    (!rows || rows.length === 0);
+
   if (!rows || rows.length === 0) {
-    setResult('No data rows found in the file.');
-    return;
+    if (!listOnlyOk) {
+      setResult('No data rows found in the file.');
+      return;
+    }
   }
-  
-  if (!columns || columns.length === 0) {
+
+  if ((!columns || columns.length === 0) && !listOnlyOk) {
     setResult('No columns/fields found in the file.');
     return;
   }
-  
+
   // Load Trello lists (should already be authorized, but double-check)
   try {
     await ensureAuthorized(true);
@@ -779,7 +950,12 @@ async function handleFile(file) {
     await maybeRefreshAuthUI(); // Update UI to show auth is needed
     return;
   }
-  
+
+  if (listOnlyOk) {
+    renderListOnlyImportPanel();
+    return;
+  }
+
   renderMapping(columns, rows);
 }
 
@@ -939,7 +1115,7 @@ async function activateLicense() {
   // Hide license panel and show mapping panel if we have data
   setTimeout(() => {
     hideLicensePanel();
-    if (state.rows.length > 0) {
+    if (state.rows.length > 0 || state.importListsOnly) {
       setHidden(mappingPanel, false);
     }
     t.sizeTo('body');
@@ -985,7 +1161,7 @@ async function init() {
       setResult('✓ Authorization successful! You can now upload and import files.');
       
       // If we have a file already loaded, try to reload lists
-      if (state.rows.length > 0) {
+      if (state.rows.length > 0 || state.importListsOnly) {
         try {
           await loadLists();
         } catch (err) {
