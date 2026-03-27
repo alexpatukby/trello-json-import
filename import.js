@@ -146,6 +146,21 @@ async function getGaEventParams(extra) {
   }
 }
 
+/** GA4: when the license / paywall panel is shown. Fallback params if storage/context calls fail. */
+function notifyPaywallShown() {
+  if (typeof window.trackEvent !== 'function') return;
+  getImportCount()
+    .then(function (n) {
+      return getGaEventParams({ import_number: n });
+    })
+    .then(function (p) {
+      window.trackEvent('paywall_shown', p);
+    })
+    .catch(function () {
+      window.trackEvent('paywall_shown', { free_limit: FREE_IMPORT_LIMIT });
+    });
+}
+
 /** Returns 'validation' (do not send import_failed) or a specific error_code for real failures. No PII. */
 function getImportErrorCode(message) {
   const msg = (message || '').trim();
@@ -1066,13 +1081,7 @@ function showLicensePanel() {
   buyLicenseBtn.href = LEMONSQUEEZY_CHECKOUT_URL;
   buyLicenseBtn.textContent = `Buy Lifetime License – ${LICENSE_PRICE}`;
   t.sizeTo('body');
-  if (typeof window.trackEvent === 'function') {
-    getImportCount().then(function (n) {
-      return getGaEventParams({ import_number: n });
-    }).then(function (p) {
-      window.trackEvent('paywall_shown', p);
-    });
-  }
+  notifyPaywallShown();
 }
 
 function hideLicensePanel() {
