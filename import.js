@@ -392,17 +392,23 @@ async function loadLists() {
   }
 }
 
-function guessColumn(columns, candidates) {
-  const set = new Set(columns.map((c) => nameKey(c)));
-  for (const cand of candidates) {
+/**
+ * Pick a column by header name hints. Exact match runs on `exactCandidates`; substring match
+ * uses `partialCandidates` when passed, otherwise `exactCandidates`. Separate partial lists
+ * avoid false positives (e.g. "name" matching `board_name`, "list" matching `list_id` before
+ * `list_name` in Trello export CSVs).
+ */
+function guessColumn(columns, exactCandidates, partialCandidates) {
+  const forPartial = partialCandidates !== undefined ? partialCandidates : exactCandidates;
+  for (const cand of exactCandidates) {
     const key = nameKey(cand);
     for (const c of columns) {
       if (nameKey(c) === key) return c;
     }
   }
-  // partial match
-  for (const cand of candidates) {
+  for (const cand of forPartial) {
     const key = nameKey(cand);
+    if (!key) continue;
     for (const c of columns) {
       const ck = nameKey(c);
       if (ck.includes(key) || key.includes(ck)) return c;
@@ -581,8 +587,16 @@ function renderMapping(columns, rows) {
   setSelectOptions(listColSel, columns, { allowEmpty: true, emptyLabel: '(no list column)' });
   setSelectOptions(descColSel, columns, { allowEmpty: true, emptyLabel: '(no description column)' });
 
-  titleColSel.value = guessColumn(columns, ['title', 'name', 'card', 'card title', 'summary']);
-  listColSel.value = guessColumn(columns, ['listName', 'list', 'column', 'status', 'lane', 'stage']);
+  titleColSel.value = guessColumn(
+    columns,
+    ['card_name', 'title', 'name', 'card', 'card title', 'summary'],
+    ['card_name', 'title', 'card', 'card title', 'summary']
+  );
+  listColSel.value = guessColumn(
+    columns,
+    ['list_name', 'listName', 'list name', 'list', 'column', 'status', 'lane', 'stage'],
+    ['list_name', 'listName', 'list name', 'column', 'status', 'lane', 'stage']
+  );
   // If we guessed something that isn't a real list-like column, allow empty by default.
   if (!nameKey(listColSel.value).match(/list|column|status|lane|stage|listname/)) listColSel.value = '';
 
