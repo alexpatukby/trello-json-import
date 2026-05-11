@@ -255,6 +255,37 @@ async function canImport() {
   return status.licensed || !status.limitReached;
 }
 
+/** True if postMessage came from `popupRoot` or a same-origin descendant frame inside it. */
+function isMessageSourceFromOAuthPopup(messageSource, popupRoot) {
+  if (!popupRoot || messageSource == null) return false;
+  if (messageSource === popupRoot) return true;
+  let w = messageSource;
+  for (let depth = 0; depth < 32; depth++) {
+    try {
+      const parentWin = w.parent;
+      if (!parentWin || parentWin === w) break;
+      if (parentWin === popupRoot) return true;
+      w = parentWin;
+    } catch {
+      break;
+    }
+  }
+  return false;
+}
+
+/**
+ * Real member tokens from authorize are long opaque strings (typically 64 hex chars).
+ * Host postMessage noise (e.g. "render") is short or non-alphanumeric.
+ */
+function looksLikeTrelloMemberToken(value) {
+  return (
+    typeof value === 'string' &&
+    value.length >= 64 &&
+    value.length <= 256 &&
+    /^[A-Za-z0-9]+$/.test(value)
+  );
+}
+
 async function ensureAuthorized(interactive) {
   if (state.token) return state.token;
 
@@ -284,35 +315,36 @@ async function ensureAuthorized(interactive) {
     
     let authWindow = null;
     let resolved = false;
-    
+
     const messageHandler = (event) => {
-      // Accept messages from Trello
       if (event.origin !== 'https://trello.com') return;
-      
+      // Host UI on trello.com posts non-token strings into this iframe; the OAuth
+      // completion posts from our popup (or a nested frame inside it only).
+      if (!authWindow || !isMessageSourceFromOAuthPopup(event.source, authWindow)) return;
+
       const token = event.data;
-      if (typeof token === 'string' && token.length > 0) {
-        resolved = true;
-        window.removeEventListener('message', messageHandler);
-        if (authWindow && !authWindow.closed) {
-          authWindow.close();
-        }
-        resolve(token);
+      if (!looksLikeTrelloMemberToken(token)) return;
+
+      resolved = true;
+      window.removeEventListener('message', messageHandler);
+      if (!authWindow.closed) {
+        authWindow.close();
       }
+      resolve(token);
     };
-    
-    window.addEventListener('message', messageHandler);
-    
+
     authWindow = window.open(
       authUrl,
       'TrelloAuth',
       `width=${width},height=${height},left=${left},top=${top}`
     );
-    
+
     if (!authWindow) {
-      window.removeEventListener('message', messageHandler);
       reject(new Error('Popup blocked. Please allow popups for this site.'));
       return;
     }
+
+    window.addEventListener('message', messageHandler);
     
     // Check if popup was closed without auth
     const checkClosed = setInterval(() => {
